@@ -11,7 +11,8 @@ class ImageViewer(QGraphicsView):
 
         self.scene = QGraphicsScene()
         self.setScene(self.scene)
-
+        
+        # Initialize variables
         self.image_item = None
         self.rect_items = []
         self.coord_labels_map = {}  # Map rect -> coord labels
@@ -29,7 +30,7 @@ class ImageViewer(QGraphicsView):
         else:
             self.setDragMode(QGraphicsView.ScrollHandDrag)
 
-
+    #Load and display an image
     def load_image(self, file_path):
         pixmap = QPixmap(file_path)
         self.scene.clear()
@@ -38,7 +39,7 @@ class ImageViewer(QGraphicsView):
         self.rect_items.clear()
         self.coord_labels_map.clear()
         self.fitInView(self.image_item, Qt.KeepAspectRatio)
-
+    #Enable or disable drawing mode
     def enable_drawing(self, enabled):
         self.drawing_enabled = enabled
         if enabled:
@@ -63,6 +64,8 @@ class ImageViewer(QGraphicsView):
     def mousePressEvent(self, event):
        pos = self.mapToScene(event.pos())
 
+
+       # If in erase mode and left mouse is clicked
        if self.erase_enabled and event.button() == Qt.LeftButton:
         for rect in self.rect_items:
             if rect.rect().contains(pos):
@@ -86,7 +89,7 @@ class ImageViewer(QGraphicsView):
             rect = QRectF(self.start_pos, current_pos).normalized()
             self.rect_items[-1].setRect(rect)
         super().mouseMoveEvent(event)
-
+    #Finish drawing and add coordinate labels
     def mouseReleaseEvent(self, event):
         if self.drawing_enabled and self.rect_items:
             rect = self.rect_items[-1].rect()
@@ -101,7 +104,7 @@ class ImageViewer(QGraphicsView):
             bottom_right_label.setFont(font)
             bottom_right_label.setDefaultTextColor(Qt.red)
             bottom_right_label.setPos(rect.right(), rect.bottom())
-
+            # Add labels to scene and map
             self.scene.addItem(top_left_label)
             self.scene.addItem(bottom_right_label)
             self.coord_labels_map[self.rect_items[-1]] = [top_left_label, bottom_right_label]
@@ -117,7 +120,7 @@ class ImageViewer(QGraphicsView):
                 self.scene.removeItem(label)
             del self.coord_labels_map[rect]
 
-    
+    #Crop all rectangles and save them as images with metadata
     def crop_boxes(self):
         if not self.image_item:
             return
