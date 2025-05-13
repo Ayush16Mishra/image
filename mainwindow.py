@@ -1,9 +1,13 @@
-from PyQt5.QtWidgets import QMainWindow, QToolBar, QAction, QPushButton, QVBoxLayout, QWidget, QFileDialog, QLineEdit, QLabel, QFormLayout, QDialog, QDialogButtonBox
+from PyQt5.QtWidgets import QMainWindow, QToolBar, QAction, QPushButton, QVBoxLayout,QHBoxLayout, QWidget, QFileDialog, QLineEdit, QLabel, QFormLayout, QDialog, QDialogButtonBox,QInputDialog
 from image_viewer import ImageViewer
 from PyQt5.QtCore import Qt
+from reportlab.pdfgen import canvas
 import os
+from PIL import Image  # Add this import at the top of your file
 from algo import process_images_in_directory
 from replace import paste_edited_crops_dialog
+from crop import crop_images_by_json
+from pdf import png_to_pdf
 
 
 class MainWindow(QMainWindow):
@@ -17,26 +21,38 @@ class MainWindow(QMainWindow):
         self.viewer = ImageViewer()
         layout.addWidget(self.viewer)
 
-        # Add open image button
-        self.open_button = QPushButton("Open Image", self)
-        self.open_button.clicked.connect(self.open_image)
-        layout.addWidget(self.open_button)
-
-        # Add crop button
-        self.crop_button = QPushButton("Crop Boxes", self)
-        self.crop_button.clicked.connect(self.viewer.crop_boxes)
-        layout.addWidget(self.crop_button)
-
-        # Add processing settings button
-        self.processing_settings_button = QPushButton("Set Processing Parameters", self)
-        self.processing_settings_button.clicked.connect(self.open_processing_dialog)
-        layout.addWidget(self.processing_settings_button)
-
-        self.paste_button = QPushButton("Paste Edited Crops", self)
-        self.paste_button.clicked.connect(lambda: paste_edited_crops_dialog(self))
-        layout.addWidget(self.paste_button)
         
-
+# First horizontal button row
+        top_button_layout = QHBoxLayout()
+        self.open_button = QPushButton("Open Image", self)
+        self.crop_button = QPushButton("Crop Boxes", self)
+        self.processing_settings_button = QPushButton("Set Parameters", self)
+        for btn in [self.open_button, self.crop_button, self.processing_settings_button]:
+            btn.setFixedWidth(150)
+            top_button_layout.addWidget(btn)
+        
+        # Connect buttons
+        self.open_button.clicked.connect(self.open_image)
+        self.crop_button.clicked.connect(self.viewer.crop_boxes)
+        self.processing_settings_button.clicked.connect(self.open_processing_dialog)
+        
+        # Second horizontal button row
+        bottom_button_layout = QHBoxLayout()
+        self.paste_button = QPushButton("Paste Crops", self)
+        self.cp_button = QPushButton("Crop by JSON", self)
+        self.pdf_button = QPushButton("Convert to PDF", self)
+        for btn in [self.paste_button, self.cp_button, self.pdf_button]:
+            btn.setFixedWidth(150)
+            bottom_button_layout.addWidget(btn)
+        
+        # Connect buttons
+        self.paste_button.clicked.connect(lambda: paste_edited_crops_dialog(self))
+        self.cp_button.clicked.connect(self.crop_by_json_dialog)
+        self.pdf_button.clicked.connect(self.open_pdf_dialog)
+        
+        # Add both button rows to main layout
+        layout.addLayout(top_button_layout)
+        layout.addLayout(bottom_button_layout)
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
 
@@ -88,7 +104,49 @@ class MainWindow(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
         if file_path:
             self.viewer.load_image(file_path)
+   
+   
+    def open_pdf_dialog(self):
+           # Step 1: Ask the user to select a PNG file
+           png_path, _ = QFileDialog.getOpenFileName(self, "Open PNG File", "", "PNG Files (*.png)")
+           if not png_path:
+               return
+           
+           # Step 2: Ask the user to input a name for the PDF file
+           pdf_name, ok = QInputDialog.getText(self, "Enter PDF Name", "Enter the name of the PDF (without extension):")
+           if not ok or not pdf_name:
+               return
+           
+           pdf_path = pdf_name + ".pdf"
+   
+           # Step 3: Call the function to convert the PNG to PDF
+           self.png_to_pdf(png_path, pdf_path)
+   
+    def png_to_pdf(self, png_path, pdf_path):
+        if not os.path.exists(png_path):
+            print(f"Error: The file at {png_path} does not exist.")
+            return
 
+        img = Image.open(png_path)
+        img = img.convert("RGB")
+        width, height = img.size
+
+        # Save image temporarily as JPEG
+        temp_img_path = "temp_image.jpg"
+        img.save(temp_img_path, "JPEG", quality=100)
+
+        # Set the canvas size to match the image size
+        c = canvas.Canvas(pdf_path, pagesize=(width, height))
+
+        # Draw the image so it fills the page
+        c.drawImage(temp_img_path, 0, 0, width, height)
+
+        # Save and clean up
+        c.save()
+        os.remove(temp_img_path)
+
+        print(f"PDF saved as {pdf_path}")
+   
     def open_processing_dialog(self):
         dialog = ProcessingDialog(self)
         if dialog.exec_() == QDialog.Accepted:
@@ -96,14 +154,29 @@ class MainWindow(QMainWindow):
             self.kernel_size = dialog.kernel_size
             self.percentage = dialog.percentage
             self.compare_value = dialog.compare_value
-
             # Get input and output directories
             input_directory = QFileDialog.getExistingDirectory(self, "Select Input Directory")
             output_directory = QFileDialog.getExistingDirectory(self, "Select Output Directory")
-
             if input_directory and output_directory:
                 # Call the image processing function
                 process_images_in_directory(input_directory, output_directory, self.kernel_size, self.percentage, self.compare_value)
+
+
+    def crop_by_json_dialog(self):
+        image_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+        if not image_path:
+            return
+    
+        json_path, _ = QFileDialog.getOpenFileName(self, "Select JSON File", "", "JSON Files (*.json)")
+        if not json_path:
+            return
+    
+        output_dir = QFileDialog.getExistingDirectory(self, "Select Output Directory")
+        if not output_dir:
+            return
+    
+        crop_images_by_json(image_path, json_path, output_dir)
+
 
 class ProcessingDialog(QDialog):
     def __init__(self, parent=None):
@@ -154,3 +227,4 @@ class ProcessingDialog(QDialog):
 
     def reject(self):
         super().reject()  # Close the dialog without any changes
+
