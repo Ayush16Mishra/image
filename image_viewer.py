@@ -4,6 +4,9 @@ from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, 
 from PyQt5.QtGui import QPixmap, QPen, QFont,QImage
 from PyQt5.QtCore import Qt, QRectF
 import os,json
+import threading
+from tqdm import tqdm
+
 
 class ImageViewer(QGraphicsView):
     def __init__(self):
@@ -124,29 +127,37 @@ class ImageViewer(QGraphicsView):
     def crop_boxes(self):
         if not self.image_item:
             return
-    
+    # Run cropping in a separate thread to prevent GUI freezing
+        thread = threading.Thread(target=self._crop_and_save)
+        thread.start()
+
+
+    def _crop_and_save(self):
         original_pixmap = self.image_item.pixmap()
         base_path = os.path.join(os.getcwd(), "crops")
         os.makedirs(base_path, exist_ok=True)
-    
+
         metadata = {}
-    
-        for idx, rect_item in enumerate(self.rect_items, 1):
+
+        total = len(self.rect_items)
+
+        for idx, rect_item in enumerate(tqdm(self.rect_items, desc="Cropping", unit="crop", ncols=70), 1):
             rect = rect_item.rect().toRect()
             cropped = original_pixmap.copy(rect)
-    
+
             save_path = os.path.join(base_path, f"{idx}.png")
             cropped.save(save_path)
-    
-            # Save metadata
+
             metadata[str(idx)] = {
                 "x": rect.x(),
                 "y": rect.y(),
                 "width": rect.width(),
                 "height": rect.height()
             }
-    
-        # Write metadata JSON
+
         metadata_path = os.path.join(base_path, "coordinates.json")
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=4)
+
+        print("\n Cropping complete. Saved to:", base_path)
+    
