@@ -4,6 +4,7 @@ import os
 import json
 from PIL import Image
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from tqdm import tqdm 
 
 def paste_edited_crops_dialog(parent=None):
     # Prompt user to select the JSON file containing coordinates
@@ -37,7 +38,8 @@ def paste_edited_crops_dialog(parent=None):
         return
 
     # Iterate over all regions defined in the JSON file
-    for key, coords in coords_data.items():
+    for key in tqdm(coords_data, desc="Pasting edited crops"):
+        coords = coords_data[key]
         edited_path = os.path.join(edited_folder, f"{key}.png")
         if not os.path.exists(edited_path):
             show_message("Warning", f"Missing edited image: {key}", parent)

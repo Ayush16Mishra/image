@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import os
+from tqdm import tqdm
+import time
 
 def process_image(image_path, output_dir, kernel_size, percentage, compare_value):
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
@@ -11,19 +13,20 @@ def process_image(image_path, output_dir, kernel_size, percentage, compare_value
 
     height, width = image.shape
     processed_image = image.copy()
+    total_iterations = (height - kernel_size + 1) * (width - kernel_size + 1)
+    # Iterate over the image with a sliding window of size kernel_size x kernel_size
+    with tqdm(total=total_iterations, desc="Processing image") as pbar:
+        for i in range(height - kernel_size + 1):
+            for j in range(width - kernel_size + 1):
+                block = image[i:i+kernel_size, j:j+kernel_size]
+                count = np.sum(block >= compare_value)
 
- # Iterate over the image with a sliding window of size kernel_size x kernel_size
-    for i in range(height - kernel_size + 1):
-        for j in range(width - kernel_size + 1):
-            block = image[i:i+kernel_size, j:j+kernel_size]
-            count = np.sum(block >= compare_value)
 
-
-            # If the count meets or exceeds the required percentage threshold,
-            # set the entire block to white (255) in the processed image
-            if count >= (kernel_size * kernel_size * (percentage / 100)):
-                processed_image[i:i+kernel_size, j:j+kernel_size] = 255
-
+                # If the count meets or exceeds the required percentage threshold,
+                # set the entire block to white (255) in the processed image
+                if count >= (kernel_size * kernel_size * (percentage / 100)):
+                    processed_image[i:i+kernel_size, j:j+kernel_size] = 255
+                pbar.update(1)
 
     # Create output directory if it doesn't exist
     if not os.path.exists(output_dir):
