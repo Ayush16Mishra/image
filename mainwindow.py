@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
         # Default values for processing parameters
         self.kernel_size = 2
         self.percentage = 75
-        self.compare_value = 150
+        self.compare_value = 100
 
     def create_toolbar(self):
         toolbar = QToolBar("Tools")
@@ -186,7 +186,7 @@ class ProcessingDialog(QDialog):
 
         self.kernel_size = 2
         self.percentage = 75
-        self.compare_value = 150
+        self.compare_value = 100
 
         # Layout for the dialog
         layout = QFormLayout()
