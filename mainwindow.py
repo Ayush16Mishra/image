@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QToolBar, QAction, QPushButton, QVBoxLayout,QHBoxLayout, QWidget, QFileDialog, QLineEdit, QLabel, QFormLayout, QDialog, QDialogButtonBox,QInputDialog
+from PyQt5.QtWidgets import QMainWindow, QToolBar, QAction, QPushButton, QVBoxLayout,QHBoxLayout, QWidget, QFileDialog, QLineEdit, QLabel, QFormLayout, QDialog, QDialogButtonBox,QInputDialog,QComboBox  
 from image_viewer import ImageViewer
 from PyQt5.QtCore import Qt
 from reportlab.pdfgen import canvas
@@ -62,6 +62,8 @@ class MainWindow(QMainWindow):
         self.kernel_size = 2
         self.percentage = 50
         self.compare_value = 100
+
+       
 
     def create_toolbar(self):
         toolbar = QToolBar("Tools")
@@ -150,17 +152,25 @@ class MainWindow(QMainWindow):
     def open_processing_dialog(self):
         dialog = ProcessingDialog(self)
         if dialog.exec_() == QDialog.Accepted:
-            # Get the values from the dialog and process the image
             self.kernel_size = dialog.kernel_size
             self.percentage = dialog.percentage
             self.compare_value = dialog.compare_value
-            # Get input and output directories
+            self.set_value = dialog.set_value
+            self.comparison_operator = dialog.comparison_operator
+
             input_directory = QFileDialog.getExistingDirectory(self, "Select Input Directory")
             output_directory = QFileDialog.getExistingDirectory(self, "Select Output Directory")
-            if input_directory and output_directory:
-                # Call the image processing function
-                process_images_in_directory(input_directory, output_directory, self.kernel_size, self.percentage, self.compare_value)
 
+            if input_directory and output_directory:
+                process_images_in_directory(
+                    input_directory,
+                    output_directory,
+                    self.kernel_size,
+                    self.percentage,
+                    self.compare_value,
+                    self.set_value,
+                    self.comparison_operator
+                )
 
     def crop_by_json_dialog(self):
         image_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
@@ -187,43 +197,49 @@ class ProcessingDialog(QDialog):
         self.kernel_size = 2
         self.percentage = 50
         self.compare_value = 100
+        self.comparison_operator = ">="
+        self.set_value = 255
 
-        # Layout for the dialog
         layout = QFormLayout()
 
-        # Kernel size input
         self.kernel_size_input = QLineEdit(self)
         self.kernel_size_input.setText(str(self.kernel_size))
-        layout.addRow("Kernel Size (e.g., 2 for 2x2):", self.kernel_size_input)
+        layout.addRow("Kernel Size (e.g., 2):", self.kernel_size_input)
 
-        # Percentage threshold input
         self.percentage_input = QLineEdit(self)
         self.percentage_input.setText(str(self.percentage))
-        layout.addRow("Percentage (e.g., 75 for 75%):", self.percentage_input)
+        layout.addRow("Percentage (e.g., 75):", self.percentage_input)
 
-        # Compare value input
         self.compare_value_input = QLineEdit(self)
         self.compare_value_input.setText(str(self.compare_value))
         layout.addRow("Compare Value (e.g., 150):", self.compare_value_input)
 
-        # Add OK and Cancel buttons
+        self.operator_input = QComboBox(self)
+        self.operator_input.addItems([">=", "<="])
+        layout.addRow("Comparison Operator:", self.operator_input)
+
+        self.set_value_input = QLineEdit(self)
+        self.set_value_input.setText(str(self.set_value))
+        layout.addRow("Set Value (e.g., 255):", self.set_value_input)
+
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
-
         layout.addWidget(button_box)
+
         self.setLayout(layout)
 
     def accept(self):
-        # Update the parameters with the user's inputs
         try:
             self.kernel_size = int(self.kernel_size_input.text())
             self.percentage = int(self.percentage_input.text())
             self.compare_value = int(self.compare_value_input.text())
-            super().accept()  # Close the dialog and return accepted
+            self.comparison_operator = self.operator_input.currentText()
+            self.set_value = int(self.set_value_input.text())
+            super().accept()
         except ValueError:
-            print("Please enter valid numeric values for kernel size, percentage, and compare value.")
-            return  # Stay in the dialog if values are invalid
+            print("Invalid input.")
+            return
 
     def reject(self):
         super().reject()  # Close the dialog without any changes
